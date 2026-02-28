@@ -69,7 +69,23 @@ const Conversation = () => {
       if (mode === 'speaking') {
         setStatus('agent_speaking');
         // User finished speaking — stop recording and send for assessment
-        finishUtterance();
+        finishUtterance().then((assessment) => {
+          if (assessment) {
+            // Find words with low accuracy
+            const mispronounced = assessment.words.filter(w => w.accuracyScore < 80);
+            if (mispronounced.length > 0) {
+              const wordsList = mispronounced.map(w => w.word).join(', ');
+              try {
+                // Send a contextual update to the AI to correct the user's pronunciation
+                conversation.sendContextualUpdate(
+                  `System Note: The user just mispronounced the following words: ${wordsList}. Please gently correct their pronunciation in your next response.`
+                );
+              } catch (err) {
+                console.error('Failed to send contextual update', err);
+              }
+            }
+          }
+        });
       } else if (mode === 'listening') {
         setStatus('listening');
         // User is about to speak — start recording
@@ -139,7 +155,7 @@ const Conversation = () => {
     start();
 
     return () => {
-      conversation.endSession().catch(() => {});
+      conversation.endSession().catch(() => { });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -150,7 +166,7 @@ const Conversation = () => {
 
   const endConversation = useCallback(async () => {
     setStatus('ended');
-    await conversation.endSession().catch(() => {});
+    await conversation.endSession().catch(() => { });
 
     const duration = Math.round((Date.now() - startTimeRef.current) / 1000);
 
@@ -255,13 +271,13 @@ const Conversation = () => {
                     ? { scale: [0.98, 1.02, 0.98], opacity: [0.3, 0.5, 0.3] }
                     : orbStatus === 'error'
                       ? {
-                          scale: [1, 1.05, 1],
-                          backgroundColor: [
-                            'hsl(0 72% 71%)',
-                            'hsl(0 72% 50%)',
-                            'hsl(0 72% 71%)',
-                          ],
-                        }
+                        scale: [1, 1.05, 1],
+                        backgroundColor: [
+                          'hsl(0 72% 71%)',
+                          'hsl(0 72% 50%)',
+                          'hsl(0 72% 71%)',
+                        ],
+                      }
                       : {}
             }
             transition={{
@@ -295,13 +311,12 @@ const Conversation = () => {
             {latestAssessment.words.slice(0, 10).map((w, i) => (
               <div
                 key={i}
-                className={`w-2 h-2 rounded-full ${
-                  w.tier === 'high'
+                className={`w-2 h-2 rounded-full ${w.tier === 'high'
                     ? 'bg-green-400'
                     : w.tier === 'medium'
                       ? 'bg-yellow-400'
                       : 'bg-red-400'
-                }`}
+                  }`}
                 title={`${w.word}: ${Math.round(w.probability * 100)}%`}
               />
             ))}
@@ -359,11 +374,10 @@ const Conversation = () => {
                     className={`flex ${entry.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                        entry.role === 'user'
+                      className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${entry.role === 'user'
                           ? 'bg-primary/20 text-foreground'
                           : 'bg-secondary text-foreground'
-                      }`}
+                        }`}
                     >
                       {entry.text}
                     </div>
