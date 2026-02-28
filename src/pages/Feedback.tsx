@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, RotateCcw, Plus, Check, Clock, Calendar } from 'lucide-react';
 import { FeedbackData, Scenario, UserProfile } from '@/lib/types';
 import { mockFeedback, mockScenarios } from '@/lib/mock-data';
-import { saveSession, getProfile as getStoredProfile } from '@/lib/storage';
+import { saveSession, getProfile as getStoredProfile, getSessions } from '@/lib/storage';
 
 const CircularProgress = ({ score, label = 'fluency' }: { score: number; label?: string }) => {
   const radius = 54;
@@ -48,9 +48,23 @@ const CircularProgress = ({ score, label = 'fluency' }: { score: number; label?:
 const Feedback = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const feedback: FeedbackData = location.state?.feedback || mockFeedback;
+  // Use state feedback, or most recent session (e.g. after refresh), or mock
+  const feedback: FeedbackData = (() => {
+    const fromState = location.state?.feedback as FeedbackData | undefined;
+    if (fromState) return fromState;
+    const sessions = getSessions();
+    if (sessions.length > 0) return sessions[0];
+    return mockFeedback;
+  })();
   const scenario: Scenario = location.state?.scenario || mockScenarios[0];
   const profile: UserProfile | null = location.state?.profile || getStoredProfile();
+
+  // Normalize feedback to ensure all fields exist (prevents crashes from malformed API responses)
+  const fluencyScore = typeof feedback.fluencyScore === 'number' ? feedback.fluencyScore : 0;
+  const corrections = Array.isArray(feedback.corrections) ? feedback.corrections : [];
+  const vocabulary = Array.isArray(feedback.vocabulary) ? feedback.vocabulary : [];
+  const summary = typeof feedback.summary === 'string' ? feedback.summary : '';
+  const focusTip = typeof feedback.focusTip === 'string' ? feedback.focusTip : '';
   const [savedWords, setSavedWords] = useState<Set<number>>(new Set());
   const savedRef = useRef(false);
 
@@ -82,7 +96,7 @@ const Feedback = () => {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="pt-6 space-y-4">
           <h1 className="text-xl font-bold text-foreground text-center">Here's how you did</h1>
           <div className="flex justify-center gap-6">
-            <CircularProgress score={feedback.fluencyScore} label="fluency" />
+            <CircularProgress score={fluencyScore} label="fluency" />
             {feedback.pronunciationScore != null && feedback.pronunciationScore > 0 && (
               <CircularProgress score={feedback.pronunciationScore} label="pronunciation" />
             )}
@@ -98,7 +112,7 @@ const Feedback = () => {
           </TabsList>
 
           <TabsContent value="corrections" className="space-y-3 mt-4">
-            {feedback.corrections.map((c, i) => (
+            {corrections.length > 0 ? corrections.map((c, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
                 <Card className="border-0 bg-card">
                   <CardContent className="p-4 space-y-2">
@@ -114,11 +128,13 @@ const Feedback = () => {
                   </CardContent>
                 </Card>
               </motion.div>
-            ))}
+            )) : (
+              <p className="text-xs text-muted-foreground text-center py-4">No corrections this time. Great job!</p>
+            )}
           </TabsContent>
 
           <TabsContent value="vocabulary" className="space-y-3 mt-4">
-            {feedback.vocabulary.map((v, i) => (
+            {vocabulary.length > 0 ? vocabulary.map((v, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
                 <Card className="border-0 bg-card">
                   <CardContent className="p-4">
@@ -140,21 +156,25 @@ const Feedback = () => {
                   </CardContent>
                 </Card>
               </motion.div>
-            ))}
+            )) : (
+              <p className="text-xs text-muted-foreground text-center py-4">No vocabulary items this session.</p>
+            )}
           </TabsContent>
 
           <TabsContent value="summary" className="mt-4 space-y-4">
             <Card className="border-0 bg-card">
               <CardContent className="p-4 space-y-3">
-                <p className="text-sm text-foreground leading-relaxed">{feedback.summary}</p>
-                <div className="bg-primary/10 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-primary mb-1">Focus for next session</p>
-                  <p className="text-xs text-foreground/80">{feedback.focusTip}</p>
-                </div>
+                <p className="text-sm text-foreground leading-relaxed">{summary || 'No summary available.'}</p>
+                {focusTip && (
+                  <div className="bg-primary/10 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-primary mb-1">Focus for next session</p>
+                    <p className="text-xs text-foreground/80">{focusTip}</p>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-1">
-                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(feedback.duration)}</span>
-                  <span>{feedback.language}</span>
-                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(feedback.date).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(feedback.duration ?? 0)}</span>
+                  <span>{feedback.language ?? '—'}</span>
+                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {feedback.date ? new Date(feedback.date).toLocaleDateString() : '—'}</span>
                 </div>
               </CardContent>
             </Card>

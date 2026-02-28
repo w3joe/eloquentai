@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { PhoneOff, MessageSquare, X, AlertCircle } from 'lucide-react';
 import { useConversation } from '@elevenlabs/react';
 import { Scenario, ConversationStatus, TranscriptEntry, UserProfile, LANGUAGES } from '@/lib/types';
+import type { PronunciationWord } from '@/lib/types';
 import { mockScenarios } from '@/lib/mock-data';
 import { useAudioRecorder } from '@/hooks/use-audio-recorder';
 import { generateFeedback } from '@/lib/gemini';
@@ -31,6 +32,18 @@ const statusLabel: Record<ConversationStatus, string> = {
   ended: 'Conversation ended',
   error: 'Connection lost',
 };
+
+/** Build pronunciation correction context with IPA for the ElevenLabs agent. */
+function buildPronunciationContext(mispronounced: PronunciationWord[]): string {
+  const items = mispronounced.map((w) => {
+    if (w.phonemes?.length) {
+      const ipa = `/${w.phonemes.map(p => p.phoneme).join('')}/`;
+      return `${w.word}: try ${ipa}`;
+    }
+    return w.word;
+  });
+  return items.join('; ');
+}
 
 const Conversation = () => {
   const navigate = useNavigate();
@@ -72,14 +85,12 @@ const Conversation = () => {
         // User finished speaking — stop recording and send for assessment
         finishUtterance().then((assessment) => {
           if (assessment) {
-            // Find words with low accuracy
             const mispronounced = assessment.words.filter(w => w.accuracyScore < 80);
             if (mispronounced.length > 0) {
-              const wordsList = mispronounced.map(w => w.word).join(', ');
+              const correctionContext = buildPronunciationContext(mispronounced);
               try {
-                // Send a contextual update to the AI to correct the user's pronunciation
                 conversation.sendContextualUpdate(
-                  `System Note: The user just mispronounced the following words: ${wordsList}. Please gently correct their pronunciation in your next response.`
+                  `System Note: The user just mispronounced the following. Give a SHORT explicit correction FIRST (e.g. "Quick tip: for [word], say it like [IPA]"), then continue the conversation naturally.\n\nMispronounced: ${correctionContext}`
                 );
               } catch (err) {
                 console.error('Failed to send contextual update', err);
@@ -178,7 +189,7 @@ const Conversation = () => {
     const allWords = assessments.flatMap(a => a.words);
     const pronunciationScore =
       allWords.length > 0
-        ? Math.round(allWords.reduce((sum, w) => sum + w.probability, 0) / allWords.length * 100)
+        ? Math.round(allWords.reduce((sum, w) => sum + w.accuracyScore, 0) / allWords.length)
         : 0;
 
     const targetLanguage = profile?.target_language || 'es';
@@ -303,26 +314,35 @@ const Conversation = () => {
         {orbStatus === 'agent_speaking' ? scenario.character.name : statusLabel[orbStatus]}
       </p>
 
-      {/* Pronunciation hint dots — shows latest assessment's word confidence */}
+      {/* Pronunciation feedback — words with accuracy indicators */}
       <AnimatePresence>
         {latestAssessment && orbStatus !== 'ended' && (
           <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="flex gap-1 justify-center pb-2"
+            className="flex flex-wrap gap-2 justify-center items-center px-4 pb-2 max-w-sm"
           >
-            {latestAssessment.words.slice(0, 10).map((w, i) => (
-              <div
+            {latestAssessment.words.slice(0, 12).map((w, i) => (
+              <span
                 key={i}
-                className={`w-2 h-2 rounded-full ${w.tier === 'high'
-                    ? 'bg-green-400'
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium text-foreground ${
+                  w.tier === 'high'
+                    ? 'bg-green-500/20 border border-green-500/30'
                     : w.tier === 'medium'
-                      ? 'bg-yellow-400'
-                      : 'bg-red-400'
+                      ? 'bg-amber-500/20 border border-amber-500/30'
+                      : 'bg-red-500/20 border border-red-500/30'
+                }`}
+                title={`${w.word}: ${w.accuracyScore}%`}
+              >
+                <span
+                  className={`shrink-0 w-1.5 h-1.5 rounded-full ${
+                    w.tier === 'high' ? 'bg-green-500' : w.tier === 'medium' ? 'bg-amber-500' : 'bg-red-500'
                   }`}
-                title={`${w.word}: ${Math.round(w.probability * 100)}%`}
-              />
+                  aria-hidden
+                />
+                {w.word}
+              </span>
             ))}
           </motion.div>
         )}

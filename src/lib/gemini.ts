@@ -189,12 +189,24 @@ Return ONLY valid JSON, no markdown fences.`;
   const cleaned = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
   const parsed = JSON.parse(cleaned);
 
+  // Defensive parsing: ensure arrays exist to prevent crashes in Feedback page
+  const corrections = Array.isArray(parsed.corrections)
+    ? parsed.corrections
+    : parsed.corrections
+      ? [parsed.corrections]
+      : [];
+  const vocabulary = Array.isArray(parsed.vocabulary)
+    ? parsed.vocabulary
+    : parsed.vocabulary
+      ? [parsed.vocabulary]
+      : [];
+
   return {
-    fluencyScore: parsed.fluencyScore,
-    corrections: parsed.corrections as CorrectionItem[],
-    vocabulary: parsed.vocabulary as VocabularyItem[],
-    summary: parsed.summary,
-    focusTip: parsed.focusTip,
+    fluencyScore: typeof parsed.fluencyScore === 'number' ? parsed.fluencyScore : 0,
+    corrections: corrections as CorrectionItem[],
+    vocabulary: vocabulary as VocabularyItem[],
+    summary: typeof parsed.summary === 'string' ? parsed.summary : '',
+    focusTip: typeof parsed.focusTip === 'string' ? parsed.focusTip : '',
     duration,
     scenarioName: scenario.title,
     language: targetLang,

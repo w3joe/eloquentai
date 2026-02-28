@@ -9,7 +9,7 @@ import { ArrowRight, Clock, Home, History, User, Loader2, MessageCircle } from '
 import { mockScenarios } from '@/lib/mock-data';
 import { Scenario, UserProfile } from '@/lib/types';
 import { generateScenarios, generateCustomScenario } from '@/lib/gemini';
-import { getProfile as getStoredProfile } from '@/lib/storage';
+import { getProfile as getStoredProfile, getSavedScenarios, saveScenarios } from '@/lib/storage';
 
 const difficultyColor = (d: string) => {
   if (d === 'Beginner') return 'bg-success/20 text-success';
@@ -23,7 +23,7 @@ const HomePage = () => {
   const profile: UserProfile | null = location.state?.profile || getStoredProfile();
   const whatsappScenarios: Scenario[] | undefined = location.state?.whatsappScenarios;
   const [customScenario, setCustomScenario] = useState('');
-  const [scenarios, setScenarios] = useState<Scenario[]>(mockScenarios);
+  const [scenarios, setScenarios] = useState<Scenario[]>(() => getSavedScenarios() ?? mockScenarios);
   const [whatsappGeneratedScenarios, setWhatsappGeneratedScenarios] = useState<Scenario[]>([]);
   const [loadingScenarios, setLoadingScenarios] = useState(false);
   const [loadingCustom, setLoadingCustom] = useState(false);
@@ -36,11 +36,19 @@ const HomePage = () => {
 
   useEffect(() => {
     if (!profile) return;
+    const saved = getSavedScenarios();
+    if (saved?.length) {
+      setScenarios(saved);
+      return;
+    }
     let cancelled = false;
     setLoadingScenarios(true);
     generateScenarios(profile)
       .then(generated => {
-        if (!cancelled) setScenarios(generated);
+        if (!cancelled) {
+          setScenarios(generated);
+          saveScenarios(generated);
+        }
       })
       .catch(err => {
         console.error('Failed to generate scenarios:', err);
