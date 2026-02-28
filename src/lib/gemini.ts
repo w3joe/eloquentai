@@ -116,19 +116,19 @@ export async function generateScenariosFromMessages(profile: UserProfile): Promi
   const targetLang = langName(profile.target_language);
   const messageContext = formatThreadsForLLM();
 
-  const prompt = `You are a language learning app. A student who works as a food delivery rider wants to practice ${targetLang} for their job.
+  const prompt = `You are a language learning app. A student wants to practice ${targetLang} as a CUSTOMER — ordering food, reporting delivery issues, talking to restaurant staff, or dealing with support when things go wrong.
 
-Below are their real WhatsApp message threads from work. Analyze these messages to understand the situations they encounter daily:
+Below are WhatsApp message threads (from a delivery/rider context) that illustrate common situations: wrong orders, late deliveries, address mix-ups, restaurant delays, complaints, etc. Use these as inspiration for the TYPES of situations, but frame every scenario so the student is the CUSTOMER, not the rider. The AI character should be the restaurant staff, delivery person, or support agent.
 
 ${messageContext}
 
 User profile:
-- Profession: ${profile.profession || 'Food delivery rider'}
+- Profession: ${profile.profession || 'Not specified'}
 - Level: ${profile.level}
 - Native language: ${langName(profile.native_language)}
 - Target language: ${targetLang}
 
-Based on these REAL conversations, generate 3 conversation practice scenarios that reflect situations this rider actually faces. The scenarios should help them practice ${targetLang} in contexts they deal with every day.
+Generate 3 conversation practice scenarios where the student practices ${targetLang} as a customer in real-world situations (ordering, complaining about wrong/late order, asking about status, resolving issues with staff or delivery person).
 
 Create scenarios at different difficulty levels (one Beginner, one Intermediate, one Advanced).
 
@@ -140,7 +140,7 @@ Return a JSON array where each scenario has:
 - "duration": estimated minutes (3-10)
 - "icon": a single relevant emoji
 - "scene": 1-2 sentence scene-setting description in second person, inspired by the real messages
-- "character": { "name": a ${targetLang}-appropriate name, "role": their role (customer/restaurant staff/support agent/fellow rider), "personality": 2-3 personality traits, "voiceLabel": "${targetLang} Male/Female · Style" }
+- "character": { "name": a ${targetLang}-appropriate name, "role": their role (restaurant staff/delivery person/support agent — someone the customer would interact with), "personality": 2-3 personality traits, "voiceLabel": "${targetLang} Male/Female · Style" }
 - "tips": array of 2 specific language tips for handling this real-world situation in ${targetLang}
 
 Return ONLY valid JSON array, no markdown fences.`;
