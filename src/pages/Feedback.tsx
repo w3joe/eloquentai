@@ -162,35 +162,153 @@ const Feedback = () => {
 
           <TabsContent value="pronunciation" className="space-y-3 mt-4">
             {feedback.pronunciation && feedback.pronunciation.length > 0 ? (
-              feedback.pronunciation.map((assessment, ai) => (
-                <motion.div key={ai} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: ai * 0.1 }}>
-                  <Card className="border-0 bg-card">
-                    <CardContent className="p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">Utterance {ai + 1}</p>
-                        <p className="text-xs text-muted-foreground">{assessment.overall_score}/100</p>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {assessment.words.map((w, wi) => (
-                          <Badge
-                            key={wi}
-                            variant="secondary"
-                            className={`text-xs ${
-                              w.tier === 'high'
-                                ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                                : w.tier === 'medium'
-                                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                                  : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                            }`}
-                          >
-                            {w.word}
+              <>
+                {/* Aggregate accuracy stats */}
+                {(() => {
+                  const allWords = feedback.pronunciation.flatMap(a => a.words);
+                  const avgAccuracy = allWords.length > 0
+                    ? Math.round(allWords.reduce((s, w) => s + w.accuracyScore, 0) / allWords.length)
+                    : 0;
+                  const avgFluency = feedback.pronunciation.length > 0
+                    ? Math.round(feedback.pronunciation.reduce((s, a) => s + a.fluencyScore, 0) / feedback.pronunciation.length)
+                    : 0;
+                  const avgCompleteness = feedback.pronunciation.length > 0
+                    ? Math.round(feedback.pronunciation.reduce((s, a) => s + a.completenessScore, 0) / feedback.pronunciation.length)
+                    : 0;
+                  const mispronounced = allWords.filter(w => w.accuracyScore < 80);
+
+                  return (
+                    <Card className="border-0 bg-card">
+                      <CardContent className="p-4 space-y-3">
+                        <p className="text-sm font-medium text-foreground">Overview</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="text-center">
+                            <p className={`text-2xl font-bold ${avgAccuracy >= 80 ? 'text-green-400' : avgAccuracy >= 60 ? 'text-yellow-400' : 'text-red-400'}`}>
+                              {avgAccuracy}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">Accuracy</p>
+                          </div>
+                          <div className="text-center">
+                            <p className={`text-2xl font-bold ${avgFluency >= 80 ? 'text-green-400' : avgFluency >= 60 ? 'text-yellow-400' : 'text-red-400'}`}>
+                              {avgFluency}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">Fluency</p>
+                          </div>
+                          <div className="text-center">
+                            <p className={`text-2xl font-bold ${avgCompleteness >= 80 ? 'text-green-400' : avgCompleteness >= 60 ? 'text-yellow-400' : 'text-red-400'}`}>
+                              {avgCompleteness}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">Completeness</p>
+                          </div>
+                        </div>
+                        {mispronounced.length > 0 && (
+                          <div className="pt-2 border-t border-border">
+                            <p className="text-[11px] text-muted-foreground mb-1.5">Words to practice</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {mispronounced.map((w, i) => (
+                                <Badge key={i} variant="secondary" className={`text-xs ${
+                                  w.tier === 'medium'
+                                    ? 'bg-yellow-500/20 text-yellow-400'
+                                    : 'bg-red-500/20 text-red-400'
+                                }`}>
+                                  {w.word} ({w.accuracyScore}%)
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+
+                {/* Legend */}
+                <div className="flex justify-center gap-4 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-400" /> 80+</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-400" /> 60+</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-400" /> &lt;60</span>
+                </div>
+
+                {/* Per-utterance breakdown */}
+                {feedback.pronunciation.map((assessment, ai) => (
+                  <motion.div key={ai} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: ai * 0.1 }}>
+                    <Card className="border-0 bg-card">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-foreground">"{assessment.transcript}"</p>
+                          <Badge variant="secondary" className={`text-xs ${
+                            assessment.overall_score >= 80 ? 'bg-green-500/20 text-green-400'
+                            : assessment.overall_score >= 60 ? 'bg-yellow-500/20 text-yellow-400'
+                            : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {assessment.overall_score}/100
                           </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))
+                        </div>
+
+                        {/* Score breakdown */}
+                        <div className="flex gap-3 text-[11px] text-muted-foreground">
+                          <span>Accuracy: {assessment.accuracyScore}</span>
+                          <span>Fluency: {assessment.fluencyScore}</span>
+                          <span>Completeness: {assessment.completenessScore}</span>
+                        </div>
+
+                        {/* Words with accuracy */}
+                        <div className="flex flex-wrap gap-2">
+                          {assessment.words.map((w, wi) => (
+                            <div key={wi} className="flex flex-col items-center gap-0.5">
+                              <Badge
+                                variant="secondary"
+                                className={`text-xs px-2 py-1 ${
+                                  w.tier === 'high'
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : w.tier === 'medium'
+                                      ? 'bg-yellow-500/20 text-yellow-400'
+                                      : 'bg-red-500/20 text-red-400'
+                                }`}
+                              >
+                                {w.word}
+                              </Badge>
+                              <span className={`text-[10px] ${
+                                w.tier === 'high' ? 'text-green-400'
+                                : w.tier === 'medium' ? 'text-yellow-400'
+                                : 'text-red-400'
+                              }`}>
+                                {w.accuracyScore}%
+                              </span>
+                              {w.errorType !== 'None' && (
+                                <span className="text-[9px] text-red-400">{w.errorType}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Phoneme detail for mispronounced words */}
+                        {assessment.words.some(w => w.accuracyScore < 80 && w.phonemes?.length) && (
+                          <div className="pt-2 border-t border-border space-y-1">
+                            <p className="text-[10px] text-muted-foreground font-medium">Phoneme detail</p>
+                            {assessment.words
+                              .filter(w => w.accuracyScore < 80 && w.phonemes?.length)
+                              .map((w, wi) => (
+                                <div key={wi} className="flex items-center gap-2 text-[11px]">
+                                  <span className="text-red-400 font-medium">{w.word}:</span>
+                                  <div className="flex gap-1 flex-wrap">
+                                    {w.phonemes!.map((p, pi) => (
+                                      <span key={pi} className={`px-1 rounded ${
+                                        p.accuracyScore >= 80 ? 'text-green-400' : p.accuracyScore >= 60 ? 'text-yellow-400' : 'text-red-400'
+                                      }`}>
+                                        /{p.phoneme}/ {p.accuracyScore}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </>
             ) : (
               <p className="text-xs text-muted-foreground text-center pt-4">
                 No pronunciation data available.

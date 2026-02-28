@@ -20,13 +20,50 @@ const PronunciationTest = () => {
   const startAssessment = useCallback(async () => {
     setIsListening(true);
     setError(null);
+    let stream: MediaStream | null = null;
     try {
-      const result = await assessPronunciation(language);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Record audio until silence / user stops (max 10s)
+      const ctx = new AudioContext({ sampleRate: 16000 });
+      const source = ctx.createMediaStreamSource(stream);
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      const chunks: Float32Array[] = [];
+
+      processor.onaudioprocess = (e) => {
+        chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      };
+      source.connect(processor);
+      processor.connect(ctx.destination);
+
+      // Record for up to 10 seconds, then assess
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
+      processor.disconnect();
+      source.disconnect();
+      ctx.close();
+
+      // Convert Float32 to Int16 PCM
+      const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+      const merged = new Float32Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+      const pcm = new Int16Array(merged.length);
+      for (let i = 0; i < merged.length; i++) {
+        const s = Math.max(-1, Math.min(1, merged[i]));
+        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+
+      const result = await assessPronunciation(language, pcm.buffer);
       setAssessments(prev => [result, ...prev]);
     } catch (err) {
       console.error('Assessment failed:', err);
       setError(err instanceof Error ? err.message : 'Assessment failed');
     } finally {
+      if (stream) stream.getTracks().forEach(t => t.stop());
       setIsListening(false);
     }
   }, [language]);

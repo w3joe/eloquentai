@@ -29,14 +29,18 @@ function toTier(score: number): PronunciationTier {
 }
 
 /**
- * Run a single pronunciation assessment using the browser microphone.
- * The SDK manages mic access, audio streaming, and recognition internally.
- * Returns when the user stops speaking (silence detection).
+ * Run a pronunciation assessment on a pre-recorded PCM audio buffer.
+ * Expects 16kHz, 16-bit, mono PCM (the Azure Speech SDK default input format).
  */
-export function assessPronunciation(language: string): Promise<PronunciationAssessment> {
+export function assessPronunciation(language: string, pcmAudio: ArrayBuffer): Promise<PronunciationAssessment> {
   return new Promise((resolve, reject) => {
     if (!SPEECH_KEY || !SPEECH_REGION) {
       reject(new Error('Azure Speech credentials not configured. Set VITE_AZURE_SPEECH_KEY and VITE_AZURE_SPEECH_REGION.'));
+      return;
+    }
+
+    if (pcmAudio.byteLength === 0) {
+      reject(new Error('No audio data recorded.'));
       return;
     }
 
@@ -45,7 +49,13 @@ export function assessPronunciation(language: string): Promise<PronunciationAsse
     const speechConfig = sdk.SpeechConfig.fromSubscription(SPEECH_KEY, SPEECH_REGION);
     speechConfig.speechRecognitionLanguage = locale;
 
-    const audioConfig = sdk.AudioConfig.fromDefaultMicrophoneInput();
+    // Feed the recorded PCM buffer via a PushAudioInputStream
+    const format = sdk.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1);
+    const pushStream = sdk.AudioInputStream.createPushStream(format);
+    pushStream.write(pcmAudio);
+    pushStream.close();
+
+    const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
 
     const pronunciationConfig = new sdk.PronunciationAssessmentConfig(
       '',  // empty = unscripted / free speech mode

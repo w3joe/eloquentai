@@ -10,8 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { X, ArrowRight, Loader2, MessageCircle, Check } from 'lucide-react';
 import { LANGUAGES, UserProfile } from '@/lib/types';
 import { mockProfile } from '@/lib/mock-data';
-import { extractProfile, generateScenariosFromMessages } from '@/lib/gemini';
-import { saveProfile } from '@/lib/storage';
+import { extractProfile, generateScenarios, generateScenariosFromMessages } from '@/lib/gemini';
+import { saveProfile, saveScenarios } from '@/lib/storage';
 import { dummyWhatsAppThreads } from '@/lib/whatsapp-messages';
 
 const Onboarding = () => {
@@ -35,31 +35,45 @@ const Onboarding = () => {
 
   const handleBuildProfile = async () => {
     setStep('loading');
+    let updatedProfile = profile;
     try {
       const extracted = await extractProfile(profile.bio, profile.context_tags, profile.target_language);
-      setProfile(p => ({
-        ...p,
+      updatedProfile = {
+        ...profile,
         profession: extracted.profession,
         interests: extracted.interests,
         conversation_topics: extracted.conversationTopics,
         display_name: extracted.displayName,
         level: extracted.level,
-      }));
+      };
+      setProfile(updatedProfile);
     } catch (err) {
       console.error('Profile extraction failed:', err);
       const words = profile.bio.split(/\s+/).filter(Boolean);
-      setProfile(p => ({
-        ...p,
-        profession: p.context_tags[0] || 'Professional',
-        interests: p.context_tags.slice(0, 3),
+      updatedProfile = {
+        ...profile,
+        profession: profile.context_tags[0] || 'Professional',
+        interests: profile.context_tags.slice(0, 3),
         conversation_topics: ['Daily conversations', 'Work discussions', 'Casual socializing'],
         display_name: words.slice(0, 2).join(' ') || 'User',
         level: 'Intermediate',
-      }));
+      };
+      setProfile(updatedProfile);
     }
+
+    // Generate personalized scenarios and save to localStorage
+    try {
+      const scenarios = await generateScenarios(updatedProfile);
+      setGeneratedScenarios(scenarios);
+      saveScenarios(scenarios);
+    } catch (err) {
+      console.error('Scenario generation failed:', err);
+    }
+
     setStep('summary');
   };
 
+  const [generatedScenarios, setGeneratedScenarios] = useState<import('@/lib/types').Scenario[]>([]);
   const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [whatsappScenariosLoading, setWhatsappScenariosLoading] = useState(false);

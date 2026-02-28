@@ -1,6 +1,46 @@
-# Welcome to your Lovable project
+# Eloquent AI
 
-## Project info
+## The Problem
+Language learners often lack opportunities to practice conversational skills in realistic, personalized contexts. Traditional methods struggle to mimic the fluidity of native conversations or cater to a user's specific daily interactions, such as their profession or WhatsApp chats. Furthermore, obtaining real-time, phoneme-level pronunciation feedback is difficult and expensive without a dedicated human tutor.
+
+## The Solution
+**Eloquent** is an interactive, web-based language learning application that generates hyper-personalized conversational scenarios.
+- **Google Gemini 2.5 Flash** dynamically creates scenarios based on a user's profile and real WhatsApp message history, and generates comprehensive post-conversation feedback.
+- **ElevenLabs** powers a low-latency conversational AI agent that roleplays the scenarios, allowing learners to practice natural speaking.
+- **Azure Speech Services** provides an integrated pronunciation engine, listening via the microphone to deliver precise, phoneme-level assessments and live contextual updates to the tutor to guide the user.
+
+## Architecture
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend as React Client
+    participant Gemini as Google Gemini
+    participant Voice as ElevenLabs AI
+    participant Speech as Azure Speech
+
+    User->>Frontend: Submits Profile & Context
+    Frontend->>Gemini: Generate personalized learning scenarios
+    Gemini-->>Frontend: Return 3 unique scenarios
+    User->>Frontend: Selects scenario to begin conversation
+
+    rect rgb(230, 240, 255)
+        note right of Frontend: Real-time Conversation Loop
+        User->>Frontend: Speaks into microphone
+        Frontend->>Voice: Stream audio via WebSocket
+        Frontend->>Speech: Stream PCM audio for pronunciation assessment
+        Voice-->>Frontend: Returns AI response (Audio Stream & Transcript)
+        Speech-->>Frontend: Returns word & phoneme accuracy scores
+        Frontend->>Voice: Send context update on mispronunciations
+    end
+
+    User->>Frontend: Ends conversation
+    Frontend->>Gemini: Generate feedback from transcript & duration
+    Gemini-->>Frontend: Return fluency score, corrections & tips
+```
+
+## Welcome to your Lovable project
+
+### Project info
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
