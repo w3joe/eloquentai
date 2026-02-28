@@ -7,11 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { X, ArrowRight, Loader2 } from 'lucide-react';
+import { X, ArrowRight, Loader2, MessageCircle, Check } from 'lucide-react';
 import { LANGUAGES, UserProfile } from '@/lib/types';
 import { mockProfile } from '@/lib/mock-data';
-import { extractProfile } from '@/lib/gemini';
+import { extractProfile, generateScenariosFromMessages } from '@/lib/gemini';
 import { saveProfile } from '@/lib/storage';
+import { dummyWhatsAppThreads } from '@/lib/whatsapp-messages';
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -59,6 +60,29 @@ const Onboarding = () => {
     setStep('summary');
   };
 
+  const [whatsappConnected, setWhatsappConnected] = useState(false);
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const [whatsappScenariosLoading, setWhatsappScenariosLoading] = useState(false);
+
+  const handleConnectWhatsApp = async () => {
+    setWhatsappLoading(true);
+    // Simulate WhatsApp connection delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setWhatsappConnected(true);
+    setWhatsappLoading(false);
+
+    // Now generate scenarios from the dummy messages
+    setWhatsappScenariosLoading(true);
+    try {
+      const scenarios = await generateScenariosFromMessages(profile);
+      saveProfile(profile);
+      navigate('/home', { state: { profile, whatsappScenarios: scenarios } });
+    } catch (err) {
+      console.error('Failed to generate scenarios from messages:', err);
+      setWhatsappScenariosLoading(false);
+    }
+  };
+
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
@@ -92,8 +116,8 @@ const Onboarding = () => {
             <Card className="gradient-border border-0">
               <CardContent className="p-8 space-y-6">
                 <div className="text-center space-y-2">
-                  <h1 className="text-2xl font-bold text-foreground">Your AI language partner needs to know you</h1>
-                  <p className="text-muted-foreground text-sm">The more context you share, the more relevant your practice will be</p>
+                  <h1 className="text-2xl font-bold text-foreground">Welcome to Eloquent</h1>
+                  <p className="text-muted-foreground text-sm">Tell us about yourself so we can personalize your practice</p>
                 </div>
 
                 <div className="space-y-4">
@@ -206,7 +230,7 @@ const Onboarding = () => {
                   <div className="w-16 h-16 mx-auto rounded-full bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
                     {profile.display_name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
                   </div>
-                  <h2 className="text-xl font-bold text-foreground">Here's what your AI knows</h2>
+                  <h2 className="text-xl font-bold text-foreground">Here's what Eloquent knows</h2>
                 </div>
 
                 <div className="space-y-4">
@@ -239,6 +263,45 @@ const Onboarding = () => {
                       )}
                     </div>
                   ))}
+                </div>
+
+                {/* WhatsApp Connect Section */}
+                <div className="space-y-3 pt-2">
+                  <p className="text-xs text-muted-foreground">Personalize even further with your real conversations</p>
+
+                  {whatsappScenariosLoading ? (
+                    <div className="flex items-center justify-center gap-3 py-4">
+                      <Loader2 className="h-5 w-5 text-[#25D366] animate-spin" />
+                      <div className="text-sm">
+                        <p className="font-medium text-foreground">Analyzing your conversations...</p>
+                        <p className="text-xs text-muted-foreground">
+                          Reading {dummyWhatsAppThreads.length} threads to build real-world scenarios
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 border-[#25D366]/30 hover:bg-[#25D366]/10 hover:border-[#25D366]/50 transition-all"
+                      size="lg"
+                      onClick={handleConnectWhatsApp}
+                      disabled={whatsappLoading}
+                    >
+                      {whatsappLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-[#25D366]" />
+                      ) : whatsappConnected ? (
+                        <Check className="h-4 w-4 text-[#25D366]" />
+                      ) : (
+                        <MessageCircle className="h-4 w-4 text-[#25D366]" />
+                      )}
+                      <span className="text-[#25D366] font-medium">
+                        {whatsappLoading ? 'Connecting...' : whatsappConnected ? 'Connected' : 'Connect WhatsApp'}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        Generate scenarios from your chats
+                      </span>
+                    </Button>
+                  )}
                 </div>
 
                 <Button className="w-full gap-2" size="lg" onClick={() => { saveProfile(profile); navigate('/home', { state: { profile } }); }}>

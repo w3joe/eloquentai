@@ -55,7 +55,8 @@ const Conversation = () => {
     onConnect: () => {
       setStatus('listening');
     },
-    onDisconnect: () => {
+    onDisconnect: (details) => {
+      console.warn('ElevenLabs disconnected:', details);
       setStatus('ended');
     },
     onMessage: ({ message, source }) => {
@@ -76,8 +77,11 @@ const Conversation = () => {
         startUtterance();
       }
     },
-    onError: (message) => {
-      console.error('ElevenLabs error:', message);
+    onDebug: (event) => {
+      console.log('ElevenLabs debug:', event);
+    },
+    onError: (message, context) => {
+      console.error('ElevenLabs error:', message, context);
       if (
         typeof message === 'string' &&
         (message.toLowerCase().includes('microphone') ||
@@ -111,7 +115,7 @@ const Conversation = () => {
 
         await conversation.startSession({
           agentId: AGENT_ID,
-          connectionType: 'webrtc',
+          connectionType: 'websocket',
           overrides: {
             agent: {
               prompt: {

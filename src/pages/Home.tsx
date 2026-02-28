@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Clock, Home, History, User, Loader2 } from 'lucide-react';
+import { ArrowRight, Clock, Home, History, User, Loader2, MessageCircle } from 'lucide-react';
 import { mockScenarios } from '@/lib/mock-data';
 import { Scenario, UserProfile } from '@/lib/types';
 import { generateScenarios, generateCustomScenario } from '@/lib/gemini';
@@ -21,10 +21,18 @@ const HomePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const profile: UserProfile | null = location.state?.profile || getStoredProfile();
+  const whatsappScenarios: Scenario[] | undefined = location.state?.whatsappScenarios;
   const [customScenario, setCustomScenario] = useState('');
   const [scenarios, setScenarios] = useState<Scenario[]>(mockScenarios);
+  const [whatsappGeneratedScenarios, setWhatsappGeneratedScenarios] = useState<Scenario[]>([]);
   const [loadingScenarios, setLoadingScenarios] = useState(false);
   const [loadingCustom, setLoadingCustom] = useState(false);
+
+  useEffect(() => {
+    if (whatsappScenarios?.length) {
+      setWhatsappGeneratedScenarios(whatsappScenarios);
+    }
+  }, [whatsappScenarios]);
 
   useEffect(() => {
     if (!profile) return;
@@ -69,7 +77,7 @@ const HomePage = () => {
           className="pt-8 space-y-1"
         >
           <h1 className="text-2xl font-bold text-foreground">
-            {profile?.display_name ? `Hey, ${profile.display_name} 👋` : 'Welcome 👋'}
+            {profile?.display_name ? `Hey, ${profile.display_name}` : 'Welcome to Eloquent'}
           </h1>
           <p className="text-muted-foreground">Ready to practice?</p>
         </motion.div>
@@ -117,6 +125,49 @@ const HomePage = () => {
           </div>
           )}
         </section>
+
+        {whatsappGeneratedScenarios.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-[#25D366]" />
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">From your WhatsApp</h2>
+            </div>
+            <div className="space-y-3">
+              {whatsappGeneratedScenarios.map((scenario, i) => (
+                <motion.div
+                  key={`wa-${scenario.id}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <Card
+                    className="gradient-border border-0 cursor-pointer hover:bg-secondary/50 transition-colors ring-1 ring-[#25D366]/20"
+                    onClick={() => handleScenarioClick(scenario)}
+                  >
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl">{scenario.icon}</span>
+                        <div className="flex-1 space-y-1">
+                          <h3 className="font-semibold text-foreground text-sm leading-tight">{scenario.title}</h3>
+                          <p className="text-xs text-muted-foreground">{scenario.description}</p>
+                          <div className="flex items-center gap-2 pt-1">
+                            <Badge variant="secondary" className={`text-[10px] px-2 py-0 border-0 ${difficultyColor(scenario.difficulty)}`}>
+                              {scenario.difficulty}
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> {scenario.duration} min
+                            </span>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Custom scenario</h2>
